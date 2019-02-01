@@ -7,7 +7,8 @@ jobs:
   build:
     docker:
       # specify the version you desire here
-       - image: circleci/ruby:2.6-node-browsers
+       - image: circleci/ruby:2.6.0-node
+       - image: circleci/postgres:10.6-alpine
 
       # Specify service dependencies here if necessary
       # CircleCI maintains a library of pre-built images
