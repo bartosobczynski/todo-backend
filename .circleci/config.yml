@@ -1,62 +1,69 @@
-# Ruby CircleCI 2.0 configuration file
-#
-# Check https://circleci.com/docs/2.0/language-ruby/ for more details
-#
 version: 2
+
+ruby_machine: &ruby_machine
+  working_directory: ~/repo
+  docker:
+    - image: circleci/ruby:2.6.0-node
+      environment:
+        RAILS_ENV: test
+        RACK_ENV: test
+        BUNDLE_PATH: vendor/bundle
+    - image: circleci/postgres:10.6-alpine
+      environment:
+        - POSTGRES_DB: todo-backend_test
+        - POSTGRES_USER: postgres
+        - POSTGRES_PASSWORD: ''
+    - image: redis
+
 jobs:
-  build:
-    docker:
-      # specify the version you desire here
-       - image: circleci/ruby:2.6.0-node
-       - image: circleci/postgres:10.6-alpine
-
-      # Specify service dependencies here if necessary
-      # CircleCI maintains a library of pre-built images
-      # documented at https://circleci.com/docs/2.0/circleci-images/
-      # - image: circleci/postgres:9.4
-
-    working_directory: ~/todo-backend
-
+  checkout_code:
+    <<: *ruby_machine
     steps:
       - checkout
+      - persist_to_workspace:
+          root: ~/repo
+          paths:
+            - .
 
-      # Download and cache dependencies
+  build_rails_dependencies:
+    <<: *ruby_machine
+    steps:
+      - attach_workspace:
+          at: ~/repo
       - restore_cache:
           keys:
-          - v1-dependencies-{{ checksum "Gemfile.lock" }}
-          # fallback to using the latest cache if no exact match is found
-          - v1-dependencies-
-
-      - run:
-          name: install dependencies
-          command: |
-            bundle install --jobs=4 --retry=3 --path vendor/bundle
-
+            - gems_v1-{{ checksum "Gemfile.lock" }}
+            # fallback to using the latest cache if no exact match is found
+            - gems_v1-
+      - run: bundle install --deployment --jobs=4 --retry=3
       - save_cache:
+          key: gems_v1-{{ checksum "Gemfile.lock" }}
           paths:
-            - ./vendor/bundle
-          key: v1-dependencies-{{ checksum "Gemfile.lock" }}
+            - vendor/bundle
+      - persist_to_workspace:
+          root: ~/repo
+          paths:
+            - vendor/bundle
 
-      # Database setup
-      - run: bundle exec rake db:create
-      - run: bundle exec rake db:schema:load
-
-      # run tests!
+  run_tests:
+    <<: *ruby_machine
+    steps:
+      - attach_workspace:
+          at: ~/repo
       - run:
-          name: run tests
-          command: |
-            mkdir /tmp/test-results
-            TEST_FILES="$(circleci tests glob "spec/**/*_spec.rb" | circleci tests split --split-by=timings)"
-
-            bundle exec rspec --format progress \
-                            --format RspecJunitFormatter \
-                            --out /tmp/test-results/rspec.xml \
-                            --format progress \
-                            $TEST_FILES
-
-      # collect reports
+          name: Wait for database
+          command: dockerize -wait tcp://localhost:5432 -timeout 1m
+      - run:
+          name: Bundle config
+          command: bundle config --local path ~/repo/vendor/bundle
+      - run:
+          name: Create database
+          command: bin/rails db:schema:load --trace
+      - run:
+          name: Running tests
+          command: bundle exec rspec --format progress --format RspecJunitFormatter --out test_results/rspec/results.xml
       - store_test_results:
-          path: /tmp/test-results
+          path: test_results
       - store_artifacts:
-          path: /tmp/test-results
-          destination: test-results
+          path: coverage
+          destination: /coverage
