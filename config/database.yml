@@ -1,16 +1,15 @@
 default: &default
   adapter: postgresql
   encoding: unicode
-  host: db
-  username: postgres
-  password:
-  pool: 5
 
 development:
   <<: *default
   database: todo-backend_development
 
-
 test:
   <<: *default
+  host: localhost
+  port: 5432
   database: todo-backend_test
+  username: postgres
+  password: ''
