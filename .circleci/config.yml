@@ -11,7 +11,7 @@ jobs:
           RAILS_ENV: test
       - image: postgres:9.5
         environment:
-          POSTGRES_USER: todo-backend
+          POSTGRES_USER: postgres
           POSTGRES_DB: todo-backend_test
           POSTGRES_PASSWORD: ""
     steps:
@@ -37,9 +37,6 @@ jobs:
 
       # Setup the environment
       - run: cp .sample.env .env
-
-      # Setup the database
-      - run: bundle exec rake db:setup
 
       # Run the tests
       - run: bundle exec rake
